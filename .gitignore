@@ -1,0 +1,74 @@
+# ==============================
+# Python Virtual Environment
+# ==============================
+venv/
+.venv/
+env/
+ENV/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# ==============================
+# Node / JS tools (future-proof)
+# ==============================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# ==============================
+# Build output
+# ==============================
+dist/
+build/
+.cache/
+.temp/
+out/
+
+# ==============================
+# System / Editor Files
+# ==============================
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# VS Code settings
+.vscode/
+
+# JetBrains IDE
+.idea/
+
+# ==============================
+# Logs
+# ==============================
+*.log
+logs/
+*.pid
+*.seed
+*.pid.lock
+
+# ==============================
+# Environment Files
+# ==============================
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.test
+
+# ==============================
+# Backup / Temp
+# ==============================
+*.bak
+*.tmp
+*.temp
+
+# Mac ZIP auto files
+__MACOSX/
