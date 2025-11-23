@@ -5,105 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TL Performance Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f4f7f9;
-            color: #333;
-        }
 
-        .dashboard-container {
-            max-width: 1200px;
-            margin: 20px auto;
-            padding: 20px;
-            background-color: #fff;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        }
-
-        h1 {
-            color: #007bff;
-            border-bottom: 2px solid #007bff;
-            padding-bottom: 10px;
-            margin-bottom: 20px;
-        }
-
-        /* File Upload and Filters */
-        .controls {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 20px;
-            margin-bottom: 25px;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            background-color: #f9f9f9;
-        }
-
-        .control-group {
-            display: flex;
-            flex-direction: column;
-            min-width: 150px;
-        }
-
-        .controls label {
-            font-weight: bold;
-            color: #555;
-            margin-bottom: 5px;
-            font-size: 0.9em;
-        }
-
-        /* KPI Scorecards (Stays at 4 columns, extra cards will wrap) */
-        .kpi-cards {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); /* Adjusted to auto-fit for better wrapping */
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .kpi-card {
-            background-color: #e9f5ff;
-            padding: 20px;
-            border-radius: 8px;
-            text-align: center;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-        }
-
-        /* Specific style for the Unassigned KPI */
-        #kpiUnassigned {
-            color: #dc3545; /* Red color for emphasis */
-        }
-
-        .kpi-card h3 {
-            margin: 0 0 5px 0;
-            font-size: 1.0em;
-            color: #0056b3;
-        }
-
-        .kpi-card p {
-            font-size: 2.0em;
-            font-weight: bold;
-            color: #007bff;
-            margin: 0;
-        }
-
-        /* Chart Area */
-        .chart-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 20px;
-        }
-
-        .chart-card {
-            background-color: #fff;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            min-height: 300px; /* Ensures charts have space */
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
@@ -132,11 +35,40 @@
                     <option value="all">All Team Leads</option>
                     </select>
             </div>
+            
+            <div class="control-group" id="teamFilterGroup" style="display:none;">
+                <label for="teamFilter">Filter by Team:</label>
+                <select id="teamFilter" onchange="renderDashboard()">
+                    <option value="all">All Teams (TL)</option>
+                </select>
+            </div>
+            
         </div>
+        <div class="count-section">
+            <h2>ID Usage Summary</h2>
+        
+            <div class="count-grid">
+                <div class="count-card">
+                    <h3>By Team</h3>
+                    <div id="countByTeam"></div>
+                </div>
+        
+                <div class="count-card">
+                    <h3>By Shift</h3>
+                    <div id="countByShift"></div>
+                </div>
+        
+                <div class="count-card">
+                    <h3>By TL</h3>
+                    <div id="countByTL"></div>
+                </div>
+            </div>
+        </div>
+        
 
         <div class="kpi-cards">
             <div class="kpi-card">
-                <h3>Total Volume Handled</h3>
+                <h3>Total Task Handled</h3>
                 <p id="kpiVolume">0</p>
             </div>
             <div class="kpi-card">
@@ -168,385 +100,36 @@
 
         <div class="chart-grid">
             <div class="chart-card">
-                <h2>Volume by Task Type</h2>
+                <h2>Count by Task Type</h2>
                 <canvas id="volumeByTaskChart"></canvas>
             </div>
-            <div class="chart-card">
-                <h2>Top 5 TLs by Volume</h2>
-                <canvas id="tlVolumeChart"></canvas>
-            </div>
-            <div class="chart-card">
-                <h2>AHT by Task Type (s)</h2>
-                <canvas id="ahtByTaskChart"></canvas>
-            </div>
-            <div class="chart-card">
-                <h2>Volume by Shift</h2>
+            
+            <div class="chart-card" id="tlTeamMapCard">
+                <h2>Team Leader & Team Assignment</h2>
+                <p style="text-align: center; margin-top: 50px; color: #777;">Upload data to see TL-Team mapping.</p>
+                </div>
+            
+            <div class="chart-card" id="shiftVolumeChartCard"> <h2>Total Task by Shift</h2>
                 <canvas id="shiftVolumeChart"></canvas>
             </div>
         </div>
+
+        <div class="chart-card" id="tlVolumeCard" style="margin-top: 20px;">
+            <h2>All TLs by Total Task </h2>
+            <p style="color: #555; font-size: 0.9em; margin-bottom: 10px;">This chart is designed to expand vertically to ensure all Team Leader names are fully visible, and is scrollable if the list is long.</p>
+            <canvas id="tlVolumeChart"></canvas>
+        </div>
+
+        <h2 style="margin-top: 30px; margin-bottom: 20px; color: #011f3f; border-bottom: 2px solid #ddd; padding-bottom: 10px;  padding-left:20px;">AHT by Task Type for Each Team Lead</h2>
+        <div id="tlAHTChartsContainer" class="tl-aht-grid">
+            </div>
+
+        <div id="employeeDetailsContainer">
+            <h2 class="emp_records">Employee Performance Details</h2>
+            <p id="employeeDetailTitle" style="margin-bottom: 20px; color: #0e0d0d;">Select a Team Lead from the filter above to view detailed team performance.</p>
+            </div>
     </div>
 
-    <script>
-        let rawData = [];
-        let charts = {}; // Object to store chart instances
-
-        /**
-         * Robustly parses a "DD/MM/YYYY" date string into a Date object.
-         */
-        function parseDate(dateString) {
-            const parts = dateString.split('/');
-            if (parts.length === 3) {
-                // Return a Date object (YYYY, MM-1, DD)
-                return new Date(parts[2], parts[1] - 1, parts[0]);
-            }
-            return null;
-        }
-
-        // Helper function to format a Date object into "YYYY-MM-DD" for the input field
-        function formatDateForInput(date) {
-            if (!date) return '';
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        }
-
-        // --- DATA PROCESSING FUNCTIONS ---
-
-        function calculateMetrics(data) {
-            // Return an object with default 0/null values if no data
-            if (data.length === 0) {
-                return {
-                    overallAHT: '0.00',
-                    totalVolume: 0,
-                    unassignedVolume: 0,
-                    tlMetrics: [],
-                    shiftMetrics: [],
-                    ahtData: { 'Notification': 0, 'Room Status': 0, 'Zone Events': 0 },
-                    volumeData: { 'Notification': 0, 'Room Status': 0, 'Zone Events': 0 }
-                };
-            }
-
-            const tlMap = new Map();
-            const shiftMap = new Map();
-            let totalVolume = 0;
-            let totalWeightedTime = 0;
-            
-            let unassignedVolume = 0;
-            
-            // For calculating overall AHT by task type
-            let sumAHTNotif = 0;
-            let sumAHTRoom = 0;
-            let sumAHTZone = 0;
-
-            data.forEach(item => {
-                // Parse numbers (important for JSON data from files)
-                const totalNotif = parseInt(item['Total Notification']) || 0;
-                const totalRoom = parseInt(item['Total Room Update']) || 0;
-                const totalZone = parseInt(item['Total Zone Update']) || 0;
-                const ahtNotif = parseFloat(item['AHT - Notification']) || 0;
-                const ahtRoom = parseFloat(item['AHT - Room Status']) || 0;
-                const ahtZone = parseFloat(item['AHT - Zone Events']) || 0;
-
-                const dayVolume = totalNotif + totalRoom + totalZone;
-                const dayWeightedTime = 
-                    (totalNotif * ahtNotif) +
-                    (totalRoom * ahtRoom) +
-                    (totalZone * ahtZone);
-                
-                totalVolume += dayVolume;
-                totalWeightedTime += dayWeightedTime;
-
-                // Aggregate AHT sums for overall average calculation
-                sumAHTNotif += ahtNotif;
-                sumAHTRoom += ahtRoom;
-                sumAHTZone += ahtZone;
-
-
-                // --- EMP ID Handling for Unassigned Work ---
-                const empId = item['EMP ID'] ? item['EMP ID'].trim() : '';
-
-                if (!empId || empId.toUpperCase() === '#N/A' || empId.toUpperCase() === 'N/A') {
-                    // Aggregate work volume for the unassigned category
-                    unassignedVolume += dayVolume;
-                }
-
-                // TL Aggregation
-                const tl = item['TL'];
-                const currentTL = tlMap.get(tl) || { volume: 0, weightedTime: 0, count: 0 };
-                currentTL.volume += dayVolume;
-                currentTL.weightedTime += dayWeightedTime;
-                currentTL.count += 1;
-                tlMap.set(tl, currentTL);
-
-                // Shift Aggregation
-                const shift = item['Shift'];
-                const currentShift = shiftMap.get(shift) || { volume: 0 };
-                currentShift.volume += dayVolume;
-                shiftMap.set(shift, currentShift);
-            });
-
-            const overallAHT = totalVolume > 0 ? (totalWeightedTime / totalVolume).toFixed(2) : '0.00';
-            
-            // TL Volume and AHT
-            const tlMetrics = Array.from(tlMap.entries()).map(([tl, metrics]) => ({
-                tl,
-                volume: metrics.volume,
-                aht: metrics.volume > 0 ? (metrics.weightedTime / metrics.volume).toFixed(2) : '0.00'
-            }));
-
-            // AHT by Task Type (Global Average of AHT column values)
-            const count = data.length;
-            const ahtData = {
-                'Notification': count > 0 ? (sumAHTNotif / count) : 0,
-                'Room Status': count > 0 ? (sumAHTRoom / count) : 0,
-                'Zone Events': count > 0 ? (sumAHTZone / count) : 0,
-            };
-
-            // Volume by Task Type (Global Sum)
-            const volumeData = {
-                'Notification': data.reduce((sum, item) => sum + (parseInt(item['Total Notification']) || 0), 0),
-                'Room Status': data.reduce((sum, item) => sum + (parseInt(item['Total Room Update']) || 0), 0),
-                'Zone Events': data.reduce((sum, item) => sum + (parseInt(item['Total Zone Update']) || 0), 0),
-            };
-
-            return {
-                overallAHT,
-                totalVolume,
-                unassignedVolume, 
-                tlMetrics,
-                shiftMetrics: Array.from(shiftMap.entries()).map(([shift, metrics]) => ({ shift, volume: metrics.volume })),
-                ahtData,
-                volumeData
-            };
-        }
-
-        // --- CHART RENDERING FUNCTIONS ---
-
-        function updateKPIs(metrics) {
-            // Ensure all values are available before calling toLocaleString
-            document.getElementById('kpiVolume').innerText = (metrics.totalVolume || 0).toLocaleString();
-            document.getElementById('kpiAHT').innerText = metrics.overallAHT || '0.00';
-            
-            // Notification AHT
-            const avgNotifAHT = (metrics.ahtData && metrics.ahtData['Notification']) ? metrics.ahtData['Notification'].toFixed(2) : '0.00';
-            document.getElementById('kpiNotifAHT').innerText = avgNotifAHT; 
-
-            // Room Status AHT
-            const avgRoomAHT = (metrics.ahtData && metrics.ahtData['Room Status']) ? metrics.ahtData['Room Status'].toFixed(2) : '0.00';
-            document.getElementById('kpiRoomAHT').innerText = avgRoomAHT;
-            
-            // Zone Events AHT
-            const avgZoneAHT = (metrics.ahtData && metrics.ahtData['Zone Events']) ? metrics.ahtData['Zone Events'].toFixed(2) : '0.00';
-            document.getElementById('kpiZoneAHT').innerText = avgZoneAHT;
-
-            // Removed: kpiAvgNotif update
-
-            document.getElementById('kpiUnassigned').innerText = (metrics.unassignedVolume || 0).toLocaleString();
-        }
-
-        function createChart(chartId, type, data, options) {
-            if (charts[chartId]) {
-                charts[chartId].destroy(); // Destroy existing chart instance
-            }
-            const ctx = document.getElementById(chartId).getContext('2d');
-            charts[chartId] = new Chart(ctx, { type, data, options });
-        }
-
-        function renderVolumeByTask(metrics) {
-            const labels = Object.keys(metrics.volumeData);
-            const data = Object.values(metrics.volumeData);
-            createChart('volumeByTaskChart', 'pie', {
-                labels: labels,
-                datasets: [{
-                    data: data,
-                    backgroundColor: ['#007bff', '#28a745', '#ffc107'],
-                }]
-            }, {
-                responsive: true,
-                plugins: {
-                    legend: { position: 'top' },
-                    title: { display: false }
-                }
-            });
-        }
-
-        function renderTLVolume(metrics) {
-            const sortedTLs = metrics.tlMetrics
-                .sort((a, b) => b.volume - a.volume)
-                .slice(0, 5); // Top 5
-
-            createChart('tlVolumeChart', 'bar', {
-                labels: sortedTLs.map(m => m.tl),
-                datasets: [{
-                    label: 'Total Volume',
-                    data: sortedTLs.map(m => m.volume),
-                    backgroundColor: '#17a2b8',
-                }]
-            }, {
-                indexAxis: 'y',
-                responsive: true,
-                plugins: { legend: { display: false } }
-            });
-        }
-
-        function renderAHTByTask(metrics) {
-            const labels = Object.keys(metrics.ahtData);
-            const data = Object.values(metrics.ahtData).map(aht => aht.toFixed(2));
-            createChart('ahtByTaskChart', 'bar', {
-                labels: labels,
-                datasets: [{
-                    label: 'Avg AHT (s)',
-                    data: data,
-                    backgroundColor: ['#dc3545', '#ff851b', '#0097a7'],
-                }]
-            }, {
-                responsive: true,
-                plugins: { legend: { display: false } },
-                scales: { y: { beginAtZero: true } }
-            });
-        }
-
-        function renderShiftVolume(metrics) {
-            const shiftLabels = metrics.shiftMetrics.map(m => m.shift);
-            const shiftData = metrics.shiftMetrics.map(m => m.volume);
-
-            createChart('shiftVolumeChart', 'doughnut', {
-                labels: shiftLabels,
-                datasets: [{
-                    data: shiftData,
-                    backgroundColor: ['#6f42c1', '#fd7e14', '#20c997'],
-                }]
-            }, {
-                responsive: true,
-                plugins: {
-                    legend: { position: 'top' },
-                    title: { display: false }
-                }
-            });
-        }
-
-        function populateTLFilter(data) {
-            const tlSet = new Set(data.map(item => item['TL']));
-            const filter = document.getElementById('tlFilter');
-            filter.innerHTML = '<option value="all">All Team Leads</option>'; // Reset
-            tlSet.forEach(tl => {
-                const option = document.createElement('option');
-                option.value = tl;
-                option.textContent = tl;
-                filter.appendChild(option);
-            });
-        }
-        
-        function populateDateFilters(data) {
-            const dateElements = data.map(item => parseDate(item['Date'])).filter(d => d && !isNaN(d));
-            if (dateElements.length === 0) return;
-
-            // Find min and max date
-            const minDate = new Date(Math.min(...dateElements));
-            const maxDate = new Date(Math.max(...dateElements));
-
-            // Set the input field values
-            document.getElementById('startDateFilter').value = formatDateForInput(minDate);
-            document.getElementById('endDateFilter').value = formatDateForInput(maxDate);
-        }
-
-        // --- MAIN CONTROL FUNCTIONS ---
-
-        function renderDashboard() {
-            const selectedTL = document.getElementById('tlFilter').value;
-            const startDateStr = document.getElementById('startDateFilter').value;
-            const endDateStr = document.getElementById('endDateFilter').value;
-
-            // Convert date strings from YYYY-MM-DD input format to Date objects
-            const startDate = startDateStr ? new Date(startDateStr) : null;
-            const endDate = endDateStr ? new Date(endDateStr) : null;
-            
-            // Normalize input dates to start of day for accurate comparison
-            const startOfDay = (d) => d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : null;
-
-            // 1. Filter Data by Date
-            let filteredData = rawData.filter(item => {
-                const itemDate = parseDate(item['Date']);
-                if (!itemDate || isNaN(itemDate)) return false; // Skip invalid dates
-
-                // Get the item date normalized to start of day
-                const itemDateOnly = startOfDay(itemDate);
-                
-                let withinStart = true;
-                if (startDate) {
-                    withinStart = itemDateOnly >= startOfDay(startDate);
-                }
-
-                let withinEnd = true;
-                if (endDate) {
-                    // Filter is inclusive: itemDate <= endDate
-                    withinEnd = itemDateOnly <= startOfDay(endDate);
-                }
-                
-                return withinStart && withinEnd;
-            });
-
-            // 2. Filter Data by Team Lead (TL)
-            filteredData = selectedTL === 'all'
-                ? filteredData
-                : filteredData.filter(item => item['TL'] === selectedTL);
-
-            // 3. Calculate Metrics
-            const metrics = calculateMetrics(filteredData);
-
-            // 4. Update Visuals
-            updateKPIs(metrics);
-            renderVolumeByTask(metrics);
-            renderTLVolume(metrics);
-            renderAHTByTask(metrics);
-            renderShiftVolume(metrics);
-        }
-
-        function handleFileUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    let jsonText = e.target.result;
-                    
-                    // FIX: Sanitize the file content before parsing (BOM removal)
-                    if (jsonText.charCodeAt(0) === 0xFEFF) {
-                        jsonText = jsonText.substring(1);
-                    }
-                    jsonText = jsonText.trim(); 
-                    
-                    // Parse the sanitized JSON text
-                    rawData = JSON.parse(jsonText);
-                    
-                    // Set default date range and TL options based on new data
-                    populateDateFilters(rawData);
-                    populateTLFilter(rawData);
-                    
-                    // Render the initial dashboard
-                    renderDashboard(); 
-                } catch (error) {
-                    // Provide a more informative console message for debugging
-                    console.error("File parsing error:", error);
-                    // Display the general alert for the user
-                    alert('Error parsing JSON file. Please ensure the file is a valid JSON array, or check your browser console for details.');
-                    rawData = []; // Clear data on error
-                    // Ensure KPIs are reset if parsing fails completely
-                    updateKPIs(calculateMetrics([])); 
-                }
-            };
-            reader.readAsText(file);
-        }
-
-        // Initial setup on load (for when no file is uploaded yet)
-        document.addEventListener('DOMContentLoaded', () => {
-             // Pass empty metrics initially to ensure KPIs are set to 0
-             updateKPIs(calculateMetrics([]));
-        });
-
-    </script>
-
+    <script src="script.js"></script>
 </body>
 </html>

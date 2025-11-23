@@ -1,0 +1,255 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f7f9;
+    /* background: linear-gradient(45deg, #9cc3ed, transparent); */
+
+    color: #333;
+}
+
+.dashboard-container {
+    max-width: 1200px;
+    margin: 20px auto;
+    padding: 20px;
+    /* background-color: #fff; */
+    background: linear-gradient(-197deg, #5f699b, transparent);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
+    color: #eceff3;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+h2{
+    background: linear-gradient(45deg, #9cc3ed, transparent);
+    padding: 20px;
+}
+
+/* Count Summary Section */
+.count-section {
+    background: #ffffffcc;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 25px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.count-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.count-card {
+    background: #b7c6db;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 2px 4px 2px 1px rgba(2, 5, 2, 0.5);
+}
+
+.count-card h3 {
+    margin-top: 0;
+    color: #003c7c;
+}
+
+.count-card div {
+    margin-top: 10px;
+    font-size: 1rem;
+    line-height: 1.5rem;
+}
+
+
+.emp_records{
+    font-size: 30px;
+    margin-top: 30px;
+    margin-bottom: 15px;
+    /* color: #0056b3; */
+    border-bottom: 2px solid #ddd;
+    padding-bottom: 10px;
+}
+
+/* File Upload and Filters */
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-bottom: 25px;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background-color: #f9f9f9;
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    min-width: 150px;
+}
+
+.controls label {
+    font-weight: bold;
+    color: #555;
+    margin-bottom: 5px;
+    font-size: 0.9em;
+}
+
+/* KPI Scorecards (Adjusted to accommodate 6 cards) */
+.kpi-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.kpi-card {
+    background-color: #e9f5ff;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Specific style for the Unassigned KPI */
+#kpiUnassigned {
+    color: #dc3545; /* Red color for emphasis */
+}
+
+.kpi-card h3 {
+    margin: 0 0 5px 0;
+    font-size: 1.0em;
+    color: #0056b3;
+}
+
+.kpi-card p {
+    font-size: 2.0em;
+    font-weight: bold;
+    color: #007bff;
+    margin: 0;
+}
+
+/* Chart Area - Standard Grid (3 cards wide now) */
+.chart-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); /* Adjusted for 3 main cards */
+    gap: 20px;
+}
+        
+/* Smaller Grid for Dynamic TL AHT Charts */
+.tl-aht-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
+    gap: 20px;
+}
+
+.chart-card {
+    background-color: #fff;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    min-height: 300px; /* Ensures charts have space, except for TL Volume */
+}
+
+#volumeByTaskChart, #shiftVolumeChart, #tlVolumeChart {
+    background-color: #c0daf3;
+
+}
+#tlAHTChartsContainer{
+    font-size: 10px;
+}
+
+/* TL Team Map Style */
+.tl-team-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+    margin-top: 10px;
+}
+
+.tl-team-table th, .tl-team-table td {
+    padding: 8px;
+    border: 1px solid #e9ecef;
+    text-align: left;
+}
+
+.tl-team-table th {
+    background-color: #5bc0de; /* Info blue */
+    color: white;
+    font-weight: 600;
+}
+
+.tl-team-table tbody tr:nth-child(even) {
+    background-color: #f8f9fa;
+}
+
+.tl-team-table tbody tr:hover {
+    background-color: #e2f0ff;
+}
+
+/* Ensure the chart-card allows scrolling if the list is long */
+#tlTeamMapCard {
+    max-height: 400px; /* Limit height */
+    overflow-y: auto; /* Enable vertical scroll */
+}
+        
+/* FIX: Limit the size of the TL Volume Chart container and enable scrolling */
+#tlVolumeCard {
+    max-height: 600px; /* Set a maximum height to prevent excessive growth */
+    overflow-y: auto;  /* Enable scrolling if the chart content exceeds max-height */
+    min-height: auto;
+    font-size: 20px;
+}
+
+
+
+/* Employee Detail Table Styles */
+#employeeDetailsContainer {
+    overflow-x: auto; /* Enable horizontal scroll for the table */
+}
+        
+#employeeDetailsContainer  {
+    margin-top: 30px;
+    margin-bottom: 15px;
+    color: #021529;
+    border-bottom: 2px solid #ddd;
+    padding-bottom: 10px;
+}
+
+.employee-table {
+    width: 100%;
+    min-width: 1000px; /* Ensure table is wide enough to show all columns clearly */
+    border-collapse: collapse;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    font-size: 0.9em;
+}
+
+.employee-table th, .employee-table td {
+    border: 1px solid #e9ecef;
+    padding: 10px 12px;
+    text-align: right;
+}
+
+.employee-table th:first-child, .employee-table td:first-child,
+.employee-table th:nth-child(2), .employee-table td:nth-child(2),
+.employee-table th:nth-child(3), .employee-table td:nth-child(3) {
+    text-align: left; /* Align Name, ID, and Team left */
+}
+
+.employee-table th {
+    background-color: #007bff;
+    color: white;
+    font-weight: 600;
+}
+
+.employee-table tbody tr:nth-child(even) {
+    background-color: #f8f9fa;
+}
+
+.employee-table tbody tr:hover {
+    background-color: #e2f0ff;
+}
