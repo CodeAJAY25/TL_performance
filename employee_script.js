@@ -1,14 +1,29 @@
 let rawData = [];
-let charts = {}; 
+let charts = {};
+
+// Daily Task Volume Target
+const DAILY_TASK_TARGET = 1800;
 
 const chartOptions = {
     responsive: true,
+    // Add aspect ratio to make charts larger/taller (e.g., 2:1 ratio)
+    aspectRatio: 2.5, // Increase size significantly for better date visibility
+    maintainAspectRatio: true,
     plugins: {
         legend: { position: 'top' },
         title: { display: false }
     },
     scales: {
-        x: { ticks: { color: '#333' }, grid: { color: '#eee' } },
+        x: { 
+            ticks: { 
+                color: '#333', 
+                // *** IMPORTANT: Force display of all ticks/dates on the X-axis ***
+                autoSkip: false,
+                maxRotation: 45,
+                minRotation: 45
+            }, 
+            grid: { color: '#eee' } 
+        },
         y: { beginAtZero: true, ticks: { color: '#333' }, grid: { color: '#eee' } }
     }
 };
@@ -49,7 +64,8 @@ function calculateEmployeeMetrics(data) {
             ahtData: { 'Notification': '0.00', 'Room Status': '0.00', 'Zone Events': '0.00' }, 
             dailyPerformance: [],
             employeeName: 'N/A',
-            empId: 'N/A'
+            empId: 'N/A',
+            teamId: null // Default teamId
         };
     }
 
@@ -66,7 +82,8 @@ function calculateEmployeeMetrics(data) {
     let zoneWeightedTime = 0; 
     
     let employeeName = data[0]['Employee Name'] || 'N/A';
-    let empId = data[0]['EMP ID'] || 'N/A';
+    let empId = data[0]['EMP ID'] ? String(data[0]['EMP ID']).trim() : 'N/A';
+    let teamId = null; 
     
     const dailyPerformanceMap = new Map();
 
@@ -78,6 +95,11 @@ function calculateEmployeeMetrics(data) {
         const ahtNotif = parseFloat(item['AHT - Notification']) || 0;
         const ahtRoom = parseFloat(item['AHT - Room Status']) || 0;
         const ahtZone = parseFloat(item['AHT - Zone Events']) || 0;
+        
+        // Capture teamId from the first record
+        if (teamId === null && item['Team']) {
+            teamId = parseInt(item['Team']);
+        }
 
         const dayVolume = totalNotif + totalRoom + totalZone;
         const dayWeightedTime = 
@@ -148,7 +170,8 @@ function calculateEmployeeMetrics(data) {
         ahtData, 
         dailyPerformance,
         employeeName,
-        empId
+        empId,
+        teamId // Added teamId
     };
 }
 
@@ -175,32 +198,37 @@ function createChart(chartId, type, data, options) {
 }
 
 /**
- * Renders the daily trend charts for Volume and AHT.
+ * Renders the daily trend charts for Volume and all AHT types.
  */
 function renderEmployeeTrends(dailyPerformance, employeeName) {
     const dates = dailyPerformance.map(d => d.date);
     const volumes = dailyPerformance.map(d => d.totalVolume);
     const ahts = dailyPerformance.map(d => parseFloat(d.overallAHT));
+    // NEW AHT data
+    const notifAhts = dailyPerformance.map(d => parseFloat(d.notifAHT));
+    const roomAhts = dailyPerformance.map(d => parseFloat(d.roomAHT));
+    const zoneAhts = dailyPerformance.map(d => parseFloat(d.zoneAHT));
     
     const trendCharts = [
         { id: 'volumeTrendChart', messageId: 'volumeTrendMessage', title: 'Daily Volume Trend', data: volumes, label: 'Total Volume', color: '#007bff' },
-        { id: 'ahtTrendChart', messageId: 'ahtTrendMessage', title: 'Daily Overall AHT Trend (s)', data: ahts, label: 'Overall AHT (s)', color: '#dc3545' }
+        { id: 'ahtTrendChart', messageId: 'ahtTrendMessage', title: 'Daily Overall AHT Trend (s)', data: ahts, label: 'Overall AHT (s)', color: '#dc3545' },
+        // NEW Charts
+        { id: 'notifAHTTrendChart', messageId: 'notifAHTTrendMessage', title: 'Daily Notification AHT Trend (s)', data: notifAhts, label: 'Notification AHT (s)', color: '#28a745' },
+        { id: 'roomAHTTrendChart', messageId: 'roomAHTTrendMessage', title: 'Daily Room Status AHT Trend (s)', data: roomAhts, label: 'Room Status AHT (s)', color: '#ffc107' },
+        { id: 'zoneAHTTrendChart', messageId: 'zoneAHTTrendMessage', title: 'Daily Zone Event AHT Trend (s)', data: zoneAhts, label: 'Zone Event AHT (s)', color: '#17a2b8' },
     ];
 
     trendCharts.forEach(chartInfo => {
         const canvas = document.getElementById(chartInfo.id);
         const message = document.getElementById(chartInfo.messageId);
         
-        // Hide message, show canvas
-        if (message) message.style.display = 'none';
-        if (canvas) canvas.style.display = 'block';
+        const hasData = dailyPerformance.length > 0;
 
-        if (dailyPerformance.length === 0) {
-            // Show message, hide canvas
-            if (message) message.style.display = 'block';
-            if (canvas) canvas.style.display = 'none';
-            return;
-        }
+        // Toggle visibility based on data presence
+        if (message) message.style.display = hasData ? 'none' : 'block';
+        if (canvas) canvas.style.display = hasData ? 'block' : 'none';
+
+        if (!hasData) return;
 
         createChart(chartInfo.id, 'line', {
             labels: dates,
@@ -220,6 +248,49 @@ function renderEmployeeTrends(dailyPerformance, employeeName) {
     });
 }
 
+/**
+ * Renders the performance feedback message based on total volume.
+ */
+function renderPerformanceFeedback(metrics) {
+    const container = document.getElementById('performanceFeedbackContainer');
+    if (!container) return;
+
+    const targetTeams = [3, 4, 6];
+    // *** MODIFICATION 1: Use the constant DAILY_TASK_TARGET (1800) ***
+    const volumeThreshold = DAILY_TASK_TARGET; 
+    
+    // We check the AVERAGE daily volume for the selected period, not the total volume.
+    const numberOfDays = metrics.dailyPerformance.length;
+    const avgDailyVolume = numberOfDays > 0 ? metrics.totalVolume / numberOfDays : 0;
+
+    const empName = metrics.employeeName !== 'N/A' ? metrics.employeeName : 'Employee';
+
+    let message = '';
+    let bgColor = 'bg-gray-100 text-gray-700 border-gray-400'; // Default neutral style
+    
+    // Check if an employee is selected/data exists
+    if (metrics.empId === 'N/A' || metrics.totalVolume === 0) {
+        message = 'Select an employee and upload data to view performance feedback.';
+    } else if (targetTeams.includes(metrics.teamId)) {
+        // Rule applies to Team 3, 4, or 6
+        // *** MODIFICATION 2: Performance check against AVERAGE daily volume ***
+        if (avgDailyVolume < volumeThreshold) {
+            message = `Performance Review (Team ${metrics.teamId}): The employee's average daily task count is **${avgDailyVolume.toFixed(0).toLocaleString()}**, which is below the target of **${volumeThreshold.toLocaleString()}**. Focus on increasing daily volume across all task types.`;
+            bgColor = 'bg-red-100 text-red-800 border-red-400'; // Needs Improvement
+        } else {
+            message = `Performance Review (Team ${metrics.teamId}): Excellent Job! The employee's average daily task count is **${avgDailyVolume.toFixed(0).toLocaleString()}**, meeting or exceeding the minimum target of **${volumeThreshold.toLocaleString()}**. Keep up the great work!`;
+            bgColor = 'bg-green-100 text-green-800 border-green-400'; // Good Performance
+        }
+    } else {
+        // Rule doesn't apply to other teams or team data is missing
+        message = `Performance Review: Total tasks handled is ${metrics.totalVolume.toLocaleString()} over ${numberOfDays} day(s). Specific volume targets for Team ${metrics.teamId || 'N/A'} are not defined in this custom report.`;
+        bgColor = 'bg-blue-100 text-blue-800 border-blue-400'; // Informational
+    }
+    
+    container.className = `p-4 mt-4 mb-6 rounded-lg border-l-4 shadow-md ${bgColor}`;
+    container.innerHTML = `<p class="font-semibold">${empName}:</p><p class="mt-1">${message}</p>`;
+}
+
 
 /**
  * Renders the detailed daily performance table.
@@ -228,26 +299,29 @@ function renderEmployeeDailyTable(dailyPerformance, employeeName) {
     const container = document.getElementById('dailyDetailsContainer');
     const titleElement = document.getElementById('dailyDetailTitle');
     
+    const tableId = 'employeeDailyTable';
+    let existingTable = document.getElementById(tableId);
+
     if (dailyPerformance.length === 0) {
         titleElement.textContent = `No daily records found for ${employeeName} in the selected range.`;
-        container.querySelector('.employee-daily-table')?.remove(); 
+        if (existingTable) existingTable.remove(); 
         return;
     }
 
     titleElement.textContent = `${employeeName}'s Daily Performance Records`;
 
     let tableHTML = `
-        <table class="employee-daily-table" style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+        <table id="${tableId}" class="employee-daily-table">
             <thead>
-                <tr style="background-color: #001f3f; color: white;">
+                <tr>
                     <th>Date</th>
-                    <th>Total Task</th>
+                    <th>Total Volume</th>
                     <th>Overall AHT (s)</th>
-                    <th>Notification</th>
+                    <th>Notif Volume</th>
                     <th>Notif AHT (s)</th>
-                    <th>Room Status</th>
+                    <th>Room Volume</th>
                     <th>Room AHT (s)</th>
-                    <th>Zone Event</th>
+                    <th>Zone Volume</th>
                     <th>Zone AHT (s)</th>
                 </tr>
             </thead>
@@ -272,7 +346,6 @@ function renderEmployeeDailyTable(dailyPerformance, employeeName) {
 
     tableHTML += `</tbody></table>`;
     
-    let existingTable = container.querySelector('.employee-daily-table');
     if (existingTable) {
         existingTable.outerHTML = tableHTML;
     } else {
@@ -284,6 +357,8 @@ function renderEmployeeDailyTable(dailyPerformance, employeeName) {
 function populateTLFilter(data) {
     const tlSet = new Set(data.map(item => item['TL']).filter(tl => tl)); 
     const filter = document.getElementById('tlFilter');
+    const currentSelection = filter.value;
+    
     filter.innerHTML = '<option value="all">All Team Leads</option>'; 
     tlSet.forEach(tl => {
         const option = document.createElement('option');
@@ -291,6 +366,10 @@ function populateTLFilter(data) {
         option.textContent = tl;
         filter.appendChild(option);
     });
+    // Restore selection
+    if (Array.from(tlSet).includes(currentSelection) || currentSelection === 'all') {
+        filter.value = currentSelection;
+    }
 }
 
 function populateEmployeeFilter(data) {
@@ -298,34 +377,34 @@ function populateEmployeeFilter(data) {
     const employeeMap = new Map();
     data.forEach(item => {
         const name = item['Employee Name'] ? item['Employee Name'].trim() : 'N/A';
-        const id = item['EMP ID'] ? item['EMP ID'].trim() : 'N/A';
+        const id = item['EMP ID'] ? String(item['EMP ID']).trim() : 'N/A';
         // Only include records with a valid ID
         if (id !== 'N/A' && id.toUpperCase() !== '#N/A') {
             const key = `${name} (${id})`;
-            employeeMap.set(key, id);
+            // Store the ID as the value and the descriptive name as the key
+            employeeMap.set(key, id); 
         }
     });
     
     const filter = document.getElementById('employeeFilter');
-    const currentSelection = filter.value;
+    const currentSelectionId = filter.value; // Store the ID
     
     filter.innerHTML = '<option value="none">Select Employee</option>'; 
     
-    // Sort keys alphabetically
+    // Sort keys (descriptive names) alphabetically
     const sortedKeys = Array.from(employeeMap.keys()).sort();
     
     sortedKeys.forEach(key => {
         const id = employeeMap.get(key);
         const option = document.createElement('option');
-        // We use the ID as the value for filtering
         option.value = id; 
         option.textContent = key;
         filter.appendChild(option);
     });
     
-    // Restore selection if it still exists
-    if (employeeMap.has(currentSelection)) {
-        filter.value = currentSelection;
+    // Restore selection if the ID is still present
+    if (Array.from(employeeMap.values()).includes(currentSelectionId)) {
+        filter.value = currentSelectionId;
     }
 }
 
@@ -337,8 +416,13 @@ function populateDateFilters(data) {
     const minDate = new Date(Math.min(...dateElements));
     const maxDate = new Date(Math.max(...dateElements));
 
-    document.getElementById('startDateFilter').value = formatDateForInput(minDate);
-    document.getElementById('endDateFilter').value = formatDateForInput(maxDate);
+    // Only update if filters are empty
+    if (!document.getElementById('startDateFilter').value) {
+        document.getElementById('startDateFilter').value = formatDateForInput(minDate);
+    }
+    if (!document.getElementById('endDateFilter').value) {
+        document.getElementById('endDateFilter').value = formatDateForInput(maxDate);
+    }
 }
 
 // --- MAIN CONTROL FUNCTIONS ---
@@ -366,7 +450,10 @@ function renderDashboard() {
             withinDate = itemDateOnly >= startOfDay(startDate);
         }
         if (endDate) {
-            withinDate = withinDate && (itemDateOnly <= startOfDay(endDate));
+            // Check against end date, setting time to end of day to include the full day
+            const endOfDay = new Date(endDate);
+            endOfDay.setHours(23, 59, 59, 999);
+            withinDate = withinDate && (itemDateOnly <= endOfDay);
         }
 
         let tlMatch = selectedTL === 'all' || item['TL'] === selectedTL;
@@ -374,14 +461,13 @@ function renderDashboard() {
         return withinDate && tlMatch;
     });
 
-    // We must repopulate the Employee filter after date/TL filtering to show only valid options
-    // This allows the employee filter to drive the final view
+    // Repopulate the Employee filter after date/TL filtering to show only valid options
     populateEmployeeFilter(filteredData);
     
     // 2. Filter data down to the selected employee (using the selectedEmpId from the filter)
     let employeeData = filteredData;
     if (selectedEmpId !== 'none') {
-         employeeData = filteredData.filter(item => item['EMP ID'] === selectedEmpId);
+         employeeData = filteredData.filter(item => String(item['EMP ID']).trim() === selectedEmpId);
     } else {
          // If no employee is selected, we show empty state
          employeeData = [];
@@ -393,7 +479,7 @@ function renderDashboard() {
     // 4. Update Visuals
     
     // Update dashboard title to show selected employee
-    const dashboardTitle = document.querySelector('.dashboard-container h1');
+    const dashboardTitle = document.getElementById('dashboardTitle');
     if (selectedEmpId !== 'none' && metrics.employeeName !== 'N/A') {
         dashboardTitle.innerHTML = `👤 ${metrics.employeeName} (${metrics.empId}) Performance & Progress`;
     } else {
@@ -401,50 +487,64 @@ function renderDashboard() {
     }
 
     updateKPIs(metrics);
+    renderPerformanceFeedback(metrics); // NEW: Performance Feedback
     renderEmployeeTrends(metrics.dailyPerformance, metrics.employeeName);
     renderEmployeeDailyTable(metrics.dailyPerformance, metrics.employeeName);
 }
 
+/**
+ * Handles Excel file upload and conversion to JSON using SheetJS.
+ */
 function handleFileUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = function(e) {
-        let jsonText = e.target.result;
-        
         try {
-            // 1. Remove BOM (Byte Order Mark) if present
-            if (jsonText.charCodeAt(0) === 0xFEFF) {
-                jsonText = jsonText.substring(1);
+            // 1. Read the workbook data as a binary string
+            const data = e.target.result;
+            // Use window.XLSX globally available from the CDN script
+            const workbook = XLSX.read(data, { type: 'binary' });
+
+            // 2. Assume the data is in the first sheet and get the worksheet
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+
+            // 3. Convert the sheet to a JSON array (array of objects)
+            // header: 1 means interpret the first row as column headers
+            rawData = XLSX.utils.sheet_to_json(worksheet);
+
+            if (rawData.length === 0) {
+                 throw new Error("The Excel sheet is empty or has no recognizable data.");
             }
             
-            // 2. Aggressive cleanup: Remove all control characters and non-standard whitespace, then trim.
-            let cleanedJsonText = jsonText.replace(/[\x00-\x1F\x7F-\x9F]/g, "").trim(); 
-
-            // 3. Final Parsing attempt
-            rawData = JSON.parse(cleanedJsonText);
-            
-            // Populate filters based on ALL raw data initially
+            // 4. Setup filters and render dashboard
             populateDateFilters(rawData);
             populateTLFilter(rawData);
-            populateEmployeeFilter(rawData);
+            populateEmployeeFilter(rawData); 
             
             renderDashboard(); 
+
         } catch (error) {
-            console.error("File parsing error:", error, "Text snippet (first 500 chars):", jsonText.substring(0, 500));
-            alert('Error parsing JSON file. Please ensure the file is a valid JSON array.');
+            console.error("File processing error:", error);
+            // Custom console log message (replacing alert)
+            console.log('Error processing the file. Please ensure it is a valid Excel file (.xlsx or .xls) and the data is in the FIRST sheet with headers in the first row.');
             rawData = []; 
             renderDashboard(); 
         }
     };
-    reader.readAsText(file);
+    
+    // Crucial: Read the file as a binary string for SheetJS
+    reader.readAsBinaryString(file);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
      // Initial render with empty data
      const emptyMetrics = calculateEmployeeMetrics([]);
+     document.getElementById('dashboardTitle').innerHTML = '👤 Individual Employee Performance & Progress';
      updateKPIs(emptyMetrics);
+     renderPerformanceFeedback(emptyMetrics);
      renderEmployeeTrends(emptyMetrics.dailyPerformance, emptyMetrics.employeeName);
      renderEmployeeDailyTable(emptyMetrics.dailyPerformance, emptyMetrics.employeeName);
 });

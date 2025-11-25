@@ -5,64 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TL Performance Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- SheetJS library for Excel parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script> 
+    <!-- External CSS file -->
     <link rel="stylesheet" href="style.css">
 
-    <style>
-        /* General styles, assuming existing style.css */
-        .dashboard-container { max-width: 1400px; margin: 20px auto; padding: 20px; background-color: #fff; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); }
-        .kpi-cards, .chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 20px; }
-        .kpi-card { background-color: #f8f9fa; padding: 20px; border-radius: 6px; text-align: center; border-left: 5px solid #007bff; }
-        .kpi-card h3 { font-size: 0.9em; color: #6c757d; margin-bottom: 5px; }
-        .kpi-card p { font-size: 1.8em; font-weight: bold; color: #001f3f; }
-        .chart-card { background-color: #fff; padding: 20px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); }
-        .chart-card h2 { font-size: 1.2em; margin-bottom: 15px; color: #333; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-        
-        /* New styles for the switch button */
-        .header-content {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        .switch-button {
-            padding: 10px 15px;
-            background-color: #28a745; /* Green for the switch */
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 0.9em;
-            text-decoration: none; /* For the <a> tag */
-            transition: background-color 0.2s;
-            white-space: nowrap;
-        }
-        .switch-button:hover {
-            background-color: #218838;
-        }
-
-        /* Table styles (assuming tl-team-table and employee-table are styled in style.css) */
-        .employee-table, .tl-team-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        .employee-table th, .employee-table td, .tl-team-table th, .tl-team-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        .employee-table th, .tl-team-table th { background-color: #f2f2f2; color: #333; }
-        
-    </style>
+    <!-- Removed internal <style> block -->
 </head>
 <body>
 
     <div class="dashboard-container">
         
+        <!-- NEW HEADER WITH BUTTON -->
         <div class="header-content">
             <h1>TL Performance Dashboard</h1>
+            <!-- Green button for TL Dashboard -->
             <a href="employee_dashboard.html" class="switch-button">
                 Switch to Employee Dashboard
             </a>
         </div>
+        <!-- END NEW HEADER -->
+
         <div class="controls">
             <div class="control-group">
-                <label for="dataFile">Upload Data (JSON Array):</label>
-                <input type="file" id="dataFile" accept=".json" onchange="handleFileUpload(event)">
+                <label for="dataFile">Upload Data (Excel .xlsx/.xls):</label>
+                <!-- CHANGED ACCEPT ATTRIBUTE -->
+                <input type="file" id="dataFile" accept=".xlsx,.xls" onchange="handleFileUpload(event)">
             </div>
             
+            <!-- Date Filters -->
             <div class="control-group">
                 <label for="startDateFilter">Start Date:</label>
                 <input type="date" id="startDateFilter" onchange="renderDashboard()">
@@ -73,6 +44,7 @@
                 <input type="date" id="endDateFilter" onchange="renderDashboard()">
             </div>
 
+            <!-- TL Filter -->
             <div class="control-group">
                 <label for="tlFilter">Filter by Team Leader:</label>
                 <select id="tlFilter" onchange="renderDashboard()">
@@ -80,6 +52,7 @@
                 </select>
             </div>
             
+            <!-- Team Filter (Hidden until a TL is selected) -->
             <div class="control-group" id="teamFilterGroup" style="display: none;">
                 <label for="teamFilter">Filter by Team:</label>
                 <select id="teamFilter" onchange="renderDashboard()">
@@ -110,15 +83,16 @@
                 <h3>Avg Zone Event AHT (s)</h3>
                 <p id="kpiZoneAHT">0.00</p>
             </div>
+            <!-- Apply specific style via attribute for styling (CSS targets this) -->
             <div class="kpi-card" style="border-left: 5px solid #dc3545;">
                 <h3>Unassigned Volume</h3>
                 <p id="kpiUnassigned">0</p>
             </div>
         </div>
 
-        <div class="id-usage-section" style="margin-top: 20px; padding: 15px; background-color: #f0f0f5; border-radius: 6px;">
-            <h2 style="font-size: 1.1em; margin-bottom: 10px; color: #001f3f;">Unique ID Usage Summary (Filtered Data)</h2>
-            <div style="display: flex; justify-content: space-around; font-size: 0.9em;">
+        <div class="id-usage-section">
+            <h2>Unique ID Usage Summary (Filtered Data)</h2>
+            <div id="idUsageSummaryContent">
                 <div id="countByTeam"></div>
                 <div id="countByShift"></div>
                 <div id="countByTL"></div>
@@ -126,7 +100,7 @@
         </div>
 
 
-        <div class="chart-grid" style="margin-top: 20px;">
+        <div class="chart-grid">
             <div class="chart-card">
                 <h2>Volume by Task Type</h2>
                 <canvas id="volumeByTaskChart"></canvas>
@@ -134,7 +108,7 @@
             
             <div class="chart-card" id="tlTeamMapCard">
                 <h2>Team Leader & Team Assignment</h2>
-                <p style="text-align: center; margin-top: 50px; color: #777;">Upload data to see TL-Team mapping.</p>
+                <p>Upload data to see TL-Team mapping.</p>
             </div>
             
             <div class="chart-card" id="shiftVolumeChartCard">
@@ -145,20 +119,22 @@
 
         <div class="chart-card" style="margin-top: 20px;">
             <h2>Total Volume by Team Leader</h2>
+            <!-- Use internal style to control the height/overflow of the chart container -->
             <div style="height: 400px; overflow-y: auto;">
                 <canvas id="tlVolumeChart"></canvas>
             </div>
         </div>
 
         <div class="tl-aht-details" style="margin-top: 30px;">
-            <h2 style="margin-bottom: 20px; color: #011f3f; border-bottom: 2px solid #ddd; padding-bottom: 10px;">Team Leader AHT Breakdown</h2>
+            <h2>Team Leader AHT Breakdown</h2>
             <div id="tlAHTChartsContainer" class="chart-grid">
-                </div>
+                <!-- TL AHT Charts will be injected here -->
+            </div>
         </div>
 
         <div id="employeeDetailsContainer" style="margin-top: 30px;">
-            <h2 id="employeeDetailTitle" style="margin-bottom: 20px; color: #011f3f; border-bottom: 2px solid #ddd; padding-bottom: 10px;">Employee Performance Details</h2>
-            <p style="text-align: center; margin-top: 50px; color: #111010;">Select a Team Lead from the filter above to view detailed team performance.</p>
+            <h2 id="employeeDetailTitle">Employee Performance Details</h2>
+            <p>Select a Team Lead from the filter above to view detailed team performance.</p>
         </div>
     </div>
 

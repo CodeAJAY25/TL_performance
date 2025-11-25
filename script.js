@@ -15,16 +15,38 @@ const chartOptions = {
 };
 
 /**
- * Robustly parses a "DD/MM/YYYY" date string into a Date object.
+ * Safely parses a date string in DD/MM/YYYY format.
+ * Includes defensive coding to prevent TypeError if the input is not a string.
+ * @param {string} dateString - The date string to parse (e.g., "01/11/2025").
+ * @returns {Date | null} A Date object or null if parsing fails.
  */
 function parseDate(dateString) {
-    const parts = dateString.split('/');
-    if (parts.length === 3) {
-        // Return a Date object (YYYY, MM-1, DD)
-        return new Date(parts[2], parts[1] - 1, parts[0]);
+    // === CRITICAL FIX START: Check if the input is a valid string ===
+    if (typeof dateString !== 'string' || dateString.trim() === '') {
+      // If it's not a string, or is just an empty string, return null 
+      // to indicate invalid data, preventing the TypeError.
+      console.warn('Invalid date value encountered:', dateString);
+      return null;
     }
+    // === CRITICAL FIX END ===
+  
+    // Assuming the date format is DD/MM/YYYY based on the uploaded data
+    const parts = dateString.split('/');
+    
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed (Jan=0, Feb=1, etc.)
+      const year = parseInt(parts[2], 10);
+      
+      // Check for valid numbers
+      if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+        return new Date(year, month, day);
+      }
+    }
+  
+    // Return null if the format or data is incorrect
     return null;
-}
+  }
 
 // Helper function to format a Date object into "YYYY-MM-DD" for the input field
 function formatDateForInput(date) {
@@ -90,18 +112,19 @@ function calculateMetrics(data) {
             overallAHT: '0.00',
             totalVolume: 0,
             unassignedVolume: 0,
-            tlMetrics: [],
+            tlMetrics: [], // Now TL-Team specific
             shiftMetrics: [],
             ahtData: { 'Notification': 0, 'Room Status': 0, 'Zone Events': 0 }, 
             volumeData: { 'Notification': 0, 'Room Status': 0, 'Zone Events': 0 },
             employeeMetrics: [],
-            tlTeamMap: [] 
+            tlTeamMap: [] // Remains TL-specific
         };
     }
 
-    const tlMap = new Map();
+    const tlMap = new Map(); // Used for TL/Team metrics (volume, AHT by Task)
     const shiftMap = new Map();
     const employeeMap = new Map(); 
+    const tlTeamMapRestore = new Map(); // Used specifically for generating the TL & Team Assignment table (tlTeamMap)
     
     let totalVolume = 0;
     let totalWeightedTime = 0;
@@ -133,7 +156,7 @@ function calculateMetrics(data) {
         sumAHTZoneGlobal += ahtZone;
 
         // --- EMP ID Handling for Unassigned Work ---
-        const empId = item['EMP ID'] ? item['EMP ID'].trim() : '';
+        const empId = item['EMP ID'] ? String(item['EMP ID']).trim() : '';
 
         if (!empId || empId.toUpperCase() === '#N/A' || empId.toUpperCase() === 'N/A') {
             unassignedVolume += dayVolume;
@@ -175,33 +198,45 @@ function calculateMetrics(data) {
         }
 
 
-        // --- TL Aggregation (Including Team Number) ---
+        // --- TL/Team Aggregation (Composite Key: TL|Team) ---
         const tl = item['TL'];
         const team = item['Team'];
-        if (tl) {
-            const currentTL = tlMap.get(tl) || { 
+        const teamStr = String(team); // Ensure team is a string for keying
+        
+        if (tl && teamStr && teamStr !== 'N/A' && teamStr !== 'null') {
+            // Composite Key for TL Metrics (to break down volume and AHT by team)
+            const tlTeamKey = `${tl}|${teamStr}`; 
+            
+            const currentTLTeam = tlMap.get(tlTeamKey) || { 
+                tl: tl,
+                team: teamStr, // Store team number
                 volume: 0, 
                 weightedTime: 0, 
                 count: 0, 
                 sumAHTNotif: 0,
                 sumAHTRoom: 0,
                 sumAHTZone: 0,
-                teams: new Set() 
             };
 
-            currentTL.volume += dayVolume;
-            currentTL.weightedTime += dayWeightedTime;
-            currentTL.sumAHTNotif += ahtNotif;
-            currentTL.sumAHTRoom += ahtRoom;
-            currentTL.sumAHTZone += ahtZone;
-            currentTL.count += 1;
+            currentTLTeam.volume += dayVolume;
+            currentTLTeam.weightedTime += dayWeightedTime;
+            currentTLTeam.sumAHTNotif += ahtNotif;
+            currentTLTeam.sumAHTRoom += ahtRoom;
+            currentTLTeam.sumAHTZone += ahtZone;
+            currentTLTeam.count += 1;
             
-            if (team) {
-                currentTL.teams.add(team);
-            }
-            
-            tlMap.set(tl, currentTL);
+            tlMap.set(tlTeamKey, currentTLTeam);
         }
+        
+        // --- TL Team Map Restoration (TL-only aggregation for the assignment table) ---
+        if (tl) {
+            const currentTL = tlTeamMapRestore.get(tl) || { teams: new Set() };
+            if (teamStr && teamStr !== 'N/A' && teamStr !== 'null') {
+                currentTL.teams.add(teamStr);
+            }
+            tlTeamMapRestore.set(tl, currentTL);
+        }
+
 
         // Shift Aggregation
         const shift = item['Shift'];
@@ -212,9 +247,10 @@ function calculateMetrics(data) {
 
     const overallAHT = totalVolume > 0 ? (totalWeightedTime / totalVolume).toFixed(2) : '0.00';
     
-    // TL Metrics
-    const tlMetrics = Array.from(tlMap.entries()).map(([tl, metrics]) => ({
-        tl,
+    // TL Metrics (Now TL-Team Breakdown)
+    const tlMetrics = Array.from(tlMap.values()).map(metrics => ({
+        tl: metrics.tl,
+        team: metrics.team, // Now includes the team number
         volume: metrics.volume,
         aht: metrics.volume > 0 ? (metrics.weightedTime / metrics.volume).toFixed(2) : '0.00',
         ahtByTask: {
@@ -234,10 +270,11 @@ function calculateMetrics(data) {
         zoneAHT: emp.zoneVolume > 0 ? (emp.zoneWeightedTime / emp.zoneVolume).toFixed(2) : '0.00',   
     })).sort((a, b) => b.totalVolume - a.totalVolume); 
 
-    // TL Team Map
-    const tlTeamMap = Array.from(tlMap.entries()).map(([tl, metrics]) => ({
+    // TL Team Map (Assignment Table - Aggregated by TL only)
+    const tlTeamMap = Array.from(tlTeamMapRestore.entries()).map(([tl, metrics]) => ({
         tl,
-        teams: Array.from(metrics.teams).sort().join(', ') 
+        // Sort teams numerically before joining
+        teams: Array.from(metrics.teams).sort((a, b) => parseInt(a) - parseInt(b)).join(', ') 
     }));
 
 
@@ -316,10 +353,30 @@ function renderVolumeByTask(metrics) {
     });
 }
 
+/**
+ * UPDATED: Now shows a separate bar for each team managed by a TL.
+ */
 function renderTLVolume(metrics) {
-    const allTLs = metrics.tlMetrics.sort((a, b) => b.volume - a.volume); 
+    // The metrics.tlMetrics now contains objects with { tl, team, volume, ... }
+    const tlTeamVolumeData = metrics.tlMetrics.map(m => ({
+        // Create the composite label
+        label: `${m.tl} (Team ${m.team})`, 
+        volume: m.volume,
+        tl: m.tl,
+        team: m.team
+    }));
+    
+    // Primary sort: by TL name (A-Z)
+    // Secondary sort: by Team number (ascending)
+    const allTLs = tlTeamVolumeData.sort((a, b) => {
+        const tlCompare = a.tl.localeCompare(b.tl);
+        if (tlCompare !== 0) return tlCompare;
+        
+        // Convert team strings to numbers for proper numeric sorting
+        return parseInt(a.team) - parseInt(b.team);
+    }); 
 
-    // Calculate height based on the number of TLs to ensure labels are not cramped.
+    // Calculate height based on the number of entries
     const calculatedHeight = Math.max(300, allTLs.length * 40 + 80); 
 
     const canvas = document.getElementById('tlVolumeChart');
@@ -328,7 +385,7 @@ function renderTLVolume(metrics) {
     }
 
     createChart('tlVolumeChart', 'bar', {
-        labels: allTLs.map(m => m.tl),
+        labels: allTLs.map(m => m.label), // Use the new composite label
         datasets: [{
             label: 'Total Volume',
             data: allTLs.map(m => m.volume),
@@ -346,14 +403,11 @@ function renderTLVolume(metrics) {
     });
 }
 
-/**
- * FIX: Now reliably manages the canvas element by referencing the parent container's ID.
- */
 function renderShiftVolume(metrics) {
     const shiftLabels = metrics.shiftMetrics.map(m => m.shift);
     const shiftData = metrics.shiftMetrics.map(m => m.volume);
     
-    // The container is referenced by its new ID 'shiftVolumeChartCard'
+    // The container is referenced by its ID 'shiftVolumeChartCard'
     const chartCard = document.getElementById('shiftVolumeChartCard'); 
     if (!chartCard) {
          console.error("Shift chart container ('shiftVolumeChartCard') not found. Check index.html.");
@@ -362,7 +416,8 @@ function renderShiftVolume(metrics) {
 
     // Get references to the canvas and potential message
     let canvas = document.getElementById('shiftVolumeChart');
-    let message = chartCard.querySelector('p');
+    // Look for the p element within the card container
+    let message = chartCard.querySelector('p'); 
 
     // Destroy existing chart instance (if any)
     if (charts['shiftVolumeChart']) {
@@ -372,16 +427,18 @@ function renderShiftVolume(metrics) {
 
     if (shiftData.every(v => v === 0) || shiftData.length === 0) {
         // No Data: Show Message
-        if (canvas) canvas.remove(); // Remove the canvas
+        if (canvas) canvas.style.display = 'none'; // Hide the canvas
         if (!message) {
             // Add the message if it doesn't exist
-            chartCard.insertAdjacentHTML('beforeend', '<p style="text-align: center; margin-top: 50px; color: #777;">No shift volume data available for the current filters.</p>');
+             chartCard.insertAdjacentHTML('beforeend', '<p style="text-align: center; margin-top: 50px; color: #777;">No shift volume data available for the current filters.</p>');
+             message = chartCard.querySelector('p');
         }
+        if (message) message.style.display = 'block';
         return;
     }
     
     // Data Exists: Show Chart
-    if (message) message.remove(); // Remove the message
+    if (message) message.style.display = 'none'; // Hide the message
     
     if (!canvas) {
         // Re-create canvas if it was removed
@@ -396,6 +453,8 @@ function renderShiftVolume(metrics) {
         }
     }
     
+    if (canvas) canvas.style.display = 'block';
+
     // Now that the canvas is guaranteed to be in the DOM, render the chart
     createChart('shiftVolumeChart', 'doughnut', {
         labels: shiftLabels,
@@ -416,7 +475,7 @@ function renderTLTeamMap(tlTeamMap) {
     const container = document.getElementById('tlTeamMapCard');
     
     if (tlTeamMap.length === 0) {
-        container.innerHTML = '<h2>Team Leader & Team Assignment</h2><p style="text-align: center; margin-top: 50px; color: #777;">No TL-Team data available.</p>';
+        container.innerHTML = '<h2>Team Leader & Team Assignment</h2><p>No TL-Team data available.</p>';
         return;
     }
     
@@ -449,13 +508,14 @@ function renderTLTeamMap(tlTeamMap) {
 
 
 function renderTLAHTChart(tlMetric) {
-    const chartId = `ahtByTaskChart_${tlMetric.tl.replace(/[^a-zA-Z0-9]/g, '')}`;
+    // The TL Metric is now TL|Team specific, so the chart title reflects this.
+    const chartId = `ahtByTaskChart_${tlMetric.tl.replace(/[^a-zA-Z0-9]/g, '')}_${tlMetric.team}`;
     const container = document.getElementById('tlAHTChartsContainer');
 
     const chartCard = document.createElement('div');
     chartCard.className = 'chart-card';
     chartCard.innerHTML = `
-        <h2>${tlMetric.tl} - AHT by Task Type (s)</h2>
+        <h2>${tlMetric.tl} (Team ${tlMetric.team}) - AHT by Task Type (s)</h2>
         <canvas id="${chartId}"></canvas>
     `;
     container.appendChild(chartCard);
@@ -480,6 +540,7 @@ function renderTLAHTChart(tlMetric) {
 function renderAllTLAHTCharts(metrics) {
     const container = document.getElementById('tlAHTChartsContainer');
     
+    // Destroy existing charts
     Object.keys(charts).forEach(id => {
         if (id.startsWith('ahtByTaskChart_')) {
             charts[id].destroy();
@@ -488,7 +549,14 @@ function renderAllTLAHTCharts(metrics) {
     });
     container.innerHTML = ''; 
 
-    metrics.tlMetrics.forEach(tlMetric => {
+    // Sort metrics by TL name then by team number
+    const sortedMetrics = metrics.tlMetrics.sort((a, b) => {
+        const tlCompare = a.tl.localeCompare(b.tl);
+        if (tlCompare !== 0) return tlCompare;
+        return parseInt(a.team) - parseInt(b.team);
+    });
+
+    sortedMetrics.forEach(tlMetric => {
         renderTLAHTChart(tlMetric);
     });
 }
@@ -603,6 +671,17 @@ function renderIDUsageSummary(idUsageMetrics) {
         targetElement.innerHTML = html;
     };
 
+    // Clear and reset the container content placeholder
+    const summaryContent = document.getElementById('idUsageSummaryContent');
+    if (summaryContent) summaryContent.innerHTML = '';
+    
+    // Append the newly rendered content
+    if (summaryContent) {
+        summaryContent.insertAdjacentHTML('beforeend', `<div id="countByTeam"></div>`);
+        summaryContent.insertAdjacentHTML('beforeend', `<div id="countByShift"></div>`);
+        summaryContent.insertAdjacentHTML('beforeend', `<div id="countByTL"></div>`);
+    }
+
     renderMap(teamIDs, 'countByTeam', 'Team ');
     renderMap(shiftIDs, 'countByShift');
     renderMap(tlIDs, 'countByTL');
@@ -645,7 +724,7 @@ function populateTeamFilter(tl, data) {
     
     // Rebuild options
     filter.innerHTML = '<option value="all">All Teams (TL)</option>'; 
-    Array.from(teamSet).sort().forEach(team => {
+    Array.from(teamSet).sort((a, b) => parseInt(a) - parseInt(b)).forEach(team => {
         const option = document.createElement('option');
         option.value = team;
         option.textContent = `Team ${team}`;
@@ -738,50 +817,62 @@ function renderDashboard() {
     renderVolumeByTask(tlSpecificMetrics);
     renderShiftVolume(tlSpecificMetrics); 
     
-    // AHT charts reflect the filtered data set (TL Specific/Team Specific)
+    // AHT charts reflect the filtered data set, now broken down by TL and Team
     renderAllTLAHTCharts(tlSpecificMetrics); 
     
     // Employee table reflects the filtered data set
     renderEmployeePerformanceTable(tlSpecificMetrics, selectedTL, selectedTeam);
     
     // Global views use global metrics (TL Team Map and TL Volume Chart should always show ALL TLs in the date range)
+    // IMPORTANT: renderTLVolume is now using the TL|Team metrics for breakdown, even when using globalMetrics
     renderTLTeamMap(globalMetrics.tlTeamMap);
     renderTLVolume(globalMetrics);
 }
 
+/**
+ * NEW: Handles Excel file upload and conversion to JSON using SheetJS.
+ */
 function handleFileUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = function(e) {
-        let jsonText = e.target.result;
-        
         try {
-            // 1. Remove BOM (Byte Order Mark) if present
-            if (jsonText.charCodeAt(0) === 0xFEFF) {
-                jsonText = jsonText.substring(1);
+            // 1. Read the workbook data as a binary string
+            const data = e.target.result;
+            // Use window.XLSX globally available from the CDN script
+            const workbook = XLSX.read(data, { type: 'binary' });
+
+            // 2. Assume the data is in the first sheet and get the worksheet
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+
+            // 3. Convert the sheet to a JSON array (array of objects)
+            // header: 1 means interpret the first row as column headers
+            rawData = XLSX.utils.sheet_to_json(worksheet);
+
+            if (rawData.length === 0) {
+                 throw new Error("The Excel sheet is empty or has no recognizable data.");
             }
             
-            // 2. Aggressive cleanup: Remove all control characters and non-standard whitespace, then trim.
-            let cleanedJsonText = jsonText.replace(/[\x00-\x1F\x7F-\x9F]/g, "").trim(); 
-
-            // 3. Final Parsing attempt
-            rawData = JSON.parse(cleanedJsonText);
-            
+            // 4. Setup filters and render dashboard
             populateDateFilters(rawData);
             populateTLFilter(rawData);
             
             renderDashboard(); 
+
         } catch (error) {
-            console.error("File parsing error:", error, "Text snippet (first 500 chars):", jsonText.substring(0, 500));
-            alert('Error parsing JSON file. Please ensure the file is a valid JSON array. Check your browser\'s console (F12) for more details on the error.');
+            console.error("File processing error:", error);
+            // Replaced alert() with console log to follow instructions
+            console.log('Error processing the file. Please ensure it is a valid Excel file (.xlsx or .xls) and the data is in the FIRST sheet with headers in the first row.');
             rawData = []; 
-            // Render dashboard with empty data
             renderDashboard(); 
         }
     };
-    reader.readAsText(file);
+    
+    // Crucial: Read the file as a binary string for SheetJS
+    reader.readAsBinaryString(file);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
